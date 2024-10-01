@@ -1,0 +1,83 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tasky
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: tasky
+  name: tasky-config
+type: Opaque
+data:
+  mongodb-uri: bW9uZ29kYjovL3VzZXJhZG1pbjprYW1idXNpdGlzMjUwMTE5ODBAMTAuMC40LjIzMjoyNzAxNy8/YXV0aFNvdXJjZT1hZG1pbg==
+  secret-key: c2VjcmV0MTIz
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: tasky
+  name: deployment-tasky
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app-tasky
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app-tasky
+    spec:
+      containers:
+      - image: 539247466081.dkr.ecr.eu-central-1.amazonaws.com/wizzard:latest
+        imagePullPolicy: Always
+        name: tasky
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: tasky-config
+              key: mongodb-uri
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tasky-config
+              key: secret-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: tasky
+  name: service-tasky
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: app-tasky
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: tasky
+  name: ingress-tasky
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: service-tasky
+              port:
+                number: 80
